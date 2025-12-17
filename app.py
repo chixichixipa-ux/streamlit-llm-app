@@ -7,6 +7,22 @@ from openai import OpenAI
 import json
 from datetime import datetime
 
+# APIキーの取得（Streamlit Cloudとローカルどちらでも動作）
+def get_api_key():
+    # Streamlit Cloud のシークレットから取得を試みる
+    if hasattr(st, "secrets") and "OPENAI_API_KEY" in st.secrets:
+        return st.secrets["OPENAI_API_KEY"]
+    # 環境変数から取得
+    elif os.getenv("OPENAI_API_KEY"):
+        return os.getenv("OPENAI_API_KEY")
+    # どちらもない場合はエラー
+    else:
+        st.error("⚠️ OpenAI APIキーが設定されていません。")
+        st.info("ローカルで実行する場合は.envファイルにOPENAI_API_KEYを設定してください。")
+        st.info("Streamlit Cloudで実行する場合は、アプリの設定でシークレットを追加してください。")
+        st.stop()
+        return None
+
 st.set_page_config(
     page_title="🤖 AI チャットアシスタント",
     page_icon="🤖",
@@ -99,7 +115,11 @@ st.title("🤖 AI チャットアシスタント")
 st.markdown("---")
 
 # OpenAIクライアント初期化
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+api_key = get_api_key()
+if api_key:
+    client = OpenAI(api_key=api_key)
+else:
+    st.stop()
 
 # チャット履歴表示
 chat_container = st.container()
