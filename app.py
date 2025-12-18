@@ -49,21 +49,28 @@ EXPERTS = {
     }
 }
 
-# APIキーの取得（Streamlit Cloudとローカルどちらでも動作）
+# APIキーの取得（ローカル環境とStreamlit Cloud両方に対応）
 def get_api_key():
-    # Streamlit Cloud のシークレットから取得を試みる
+    """
+    優先順位:
+    1. 環境変数（.envファイル経由） - ローカル開発用
+    2. Streamlit Cloud のシークレット - デプロイ用
+    """
+    # まず環境変数（.envファイル）から取得を試みる
+    api_key = os.getenv("OPENAI_API_KEY")
+    if api_key:
+        return api_key
+    
+    # 環境変数がない場合、Streamlit Cloud のシークレットを確認
     if hasattr(st, "secrets") and "OPENAI_API_KEY" in st.secrets:
         return st.secrets["OPENAI_API_KEY"]
-    # 環境変数から取得
-    elif os.getenv("OPENAI_API_KEY"):
-        return os.getenv("OPENAI_API_KEY")
-    # どちらもない場合はエラー
-    else:
-        st.error("⚠️ OpenAI APIキーが設定されていません。")
-        st.info("ローカルで実行する場合は.envファイルにOPENAI_API_KEYを設定してください。")
-        st.info("Streamlit Cloudで実行する場合は、アプリの設定でシークレットを追加してください。")
-        st.stop()
-        return None
+    
+    # どちらもない場合はエラーメッセージを表示
+    st.error("⚠️ OpenAI APIキーが設定されていません。")
+    st.info("**ローカルで実行する場合:**\n.envファイルを作成し、`OPENAI_API_KEY=your-api-key`を追加してください。")
+    st.info("**Streamlit Cloudで実行する場合:**\nアプリの設定（⋮ → Settings → Secrets）でシークレットを追加してください。")
+    st.stop()
+    return None
 
 st.set_page_config(
     page_title="🤖 AI チャットアシスタント",
