@@ -5,8 +5,8 @@ load_dotenv()
 import streamlit as st
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.memory import ConversationBufferMemory
-from langchain.chains import ConversationChain
+from langchain_community.chat_message_histories import ChatMessageHistory
+from langchain_core.runnables.history import RunnableWithMessageHistory
 import json
 from datetime import datetime
 
@@ -86,8 +86,8 @@ if "total_tokens" not in st.session_state:
     st.session_state.total_tokens = 0
 if "selected_expert" not in st.session_state:
     st.session_state.selected_expert = "🤖 汎用AI"
-if "memory" not in st.session_state:
-    st.session_state.memory = ConversationBufferMemory(return_messages=True)
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = ChatMessageHistory()
 
 # サイドバー設定
 with st.sidebar:
@@ -106,7 +106,7 @@ with st.sidebar:
     if selected_expert != st.session_state.selected_expert:
         st.session_state.selected_expert = selected_expert
         st.session_state.messages = []
-        st.session_state.memory.clear()
+        st.session_state.chat_history.clear()
         st.rerun()
     
     # 選択された専門家の説明を表示
@@ -156,7 +156,7 @@ with st.sidebar:
         if st.button("🗑️ 履歴クリア", use_container_width=True):
             st.session_state.messages = []
             st.session_state.total_tokens = 0
-            st.session_state.memory.clear()
+            st.session_state.chat_history.clear()
             st.rerun()
     
     with col2:
@@ -201,13 +201,8 @@ if api_key:
         ("human", "{input}")
     ])
     
-    # ConversationChainの作成
-    conversation = ConversationChain(
-        llm=llm,
-        prompt=prompt,
-        memory=st.session_state.memory,
-        verbose=False
-    )
+    # チェーンの作成
+    chain = prompt | llm
 else:
     st.stop()
 
@@ -222,6 +217,7 @@ with chat_container:
 if prompt_input := st.chat_input("メッセージを入力してください..."):
     # ユーザーメッセージを追加
     st.session_state.messages.append({"role": "user", "content": prompt_input})
+    st.session_state.chat_history.add_user_message(prompt_input)
     
     with st.chat_message("user", avatar="🧑‍💻"):
         st.markdown(prompt_input)
@@ -235,12 +231,18 @@ if prompt_input := st.chat_input("メッセージを入力してください..."
         with st.spinner("考え中..."):
             try:
                 # ストリーミング対応
-                for chunk in conversation.stream({"input": prompt_input}):
-                    if "response" in chunk:
-                        full_response = chunk["response"]
+                for chunk in chain.stream({
+                    "input": prompt_input,
+                    "history": st.session_state.chat_history.messages
+                }):
+                    if hasattr(chunk, 'content'):
+                        full_response += chunk.content
                         message_placeholder.markdown(full_response + "▌")
                 
                 message_placeholder.markdown(full_response)
+                
+                # チャット履歴に追加
+                st.session_state.chat_history.add_ai_message(full_response)
                 
                 # トークン使用量の更新（概算）
                 st.session_state.total_tokens += len(prompt_input.split()) + len(full_response.split())
