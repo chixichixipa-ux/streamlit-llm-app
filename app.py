@@ -4,8 +4,8 @@ load_dotenv()
 
 import streamlit as st
 from langchain_openai import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.memory import ConversationBufferMemory
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.memory import ConversationBufferMemory
 from langchain.chains import ConversationChain
 import json
 from datetime import datetime
